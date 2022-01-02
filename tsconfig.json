@@ -1,9 +1,10 @@
 {
   "compilerOptions": {
+    "target": "esnext",
+    "module": "commonjs",
     "allowSyntheticDefaultImports": true,
     "downlevelIteration": true,
     "importHelpers": true,
-    "module": "commonjs",
     "moduleResolution": "node",
     "noEmit": true,
     "noFallthroughCasesInSwitch": true,
@@ -11,8 +12,9 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "skipLibCheck": true,
-    "strict": true,
-    "target": "es5"
+    "experimentalDecorators": true,
+    "resolveJsonModule": true,
+    "esModuleInterop": true
   },
   "include": ["src/**/*", "__tests__/**/*"]
 }

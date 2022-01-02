@@ -66,7 +66,11 @@ export interface TokenBalancesResponse {
   tokenBalances: TokenBalance[];
 }
 
-export type TokenBalance = TokenBalanceSuccess | TokenBalanceFailure;
+export interface TokenBalance {
+  address: string;
+  tokenBalance: string | null;
+  error: string | null;
+}
 
 export interface TokenBalanceSuccess {
   address: string;
@@ -328,13 +332,14 @@ function processTokenBalanceResponse(
   rawResponse: TokenBalancesResponse,
 ): TokenBalancesResponse {
   // Convert token balance fields from hex-string to decimal-string.
-  const fixedTokenBalances = rawResponse.tokenBalances.map((balance) =>
-    balance.tokenBalance != null
-      ? {
-          ...balance,
-          tokenBalance: decodeParameter("uint256", balance.tokenBalance),
-        }
-      : balance,
+  const fixedTokenBalances: TokenBalance[] = rawResponse.tokenBalances.map(
+    (balance) =>
+      balance.tokenBalance != null
+        ? {
+            ...balance,
+            tokenBalance: decodeParameter("uint256", balance.tokenBalance),
+          }
+        : balance,
   );
   return { ...rawResponse, tokenBalances: fixedTokenBalances };
 }

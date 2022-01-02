@@ -1,5 +1,5 @@
 {
-  "name": "@alch/alchemy-web3",
+  "name": "@enepti/alchemy-web3",
   "version": "1.1.9",
   "description": "Web3 client extended with Alchemy and browser provider integration.",
   "module": "dist/esm/index.js",
@@ -70,14 +70,14 @@
     "fetch-ponyfill": "^6.0.2",
     "sturdy-websocket": "^0.2.1",
     "tslib": "^2.1.0",
-    "web3": "1.6.0",
-    "web3-core": "1.6.0",
-    "web3-core-helpers": "1.6.0",
-    "web3-core-method": "1.6.0",
-    "web3-core-subscriptions": "1.6.0",
-    "web3-eth": "1.6.0",
-    "web3-eth-abi": "1.6.0",
-    "web3-utils": "1.6.0",
+    "web3": "^1.6.0",
+    "web3-core": "^1.6.0",
+    "web3-core-helpers": "^1.6.0",
+    "web3-core-method": "^1.6.0",
+    "web3-core-subscriptions": "^1.6.0",
+    "web3-eth": "^1.6.0",
+    "web3-eth-abi": "^1.6.0",
+    "web3-utils": "^1.6.0",
     "websocket": "^1.0.28"
   }
 }
