@@ -14,8 +14,10 @@ interface RequestContext {
   resolve(response: AlchemySendResult): void;
 }
 
+type RequestContextMap = { [key in JsonRpcId]: RequestContext };
+
 export function makeWebSocketSender(ws: SturdyWebSocket): AlchemySendFunction {
-  const contextsById = new Map<JsonRpcId, RequestContext>();
+  const contextsById: RequestContextMap = {};
   ws.addEventListener("message", (message) => {
     const response: WebSocketMessage = JSON.parse(message.data);
     if (!isResponse(response)) {
@@ -25,12 +27,12 @@ export function makeWebSocketSender(ws: SturdyWebSocket): AlchemySendFunction {
     if (id === undefined) {
       return;
     }
-    const context = contextsById.get(id);
+    const context = contextsById[id];
     if (!context) {
       return;
     }
     const { resolve } = context;
-    contextsById.delete(id);
+    delete contextsById[id];
     if (
       !Array.isArray(response) &&
       response.error &&
@@ -42,10 +44,11 @@ export function makeWebSocketSender(ws: SturdyWebSocket): AlchemySendFunction {
     }
   });
   ws.addEventListener("down", () => {
-    [...contextsById].forEach(([id, { request, resolve }]) => {
+    Object.keys(contextsById).forEach((id) => {
+      const { request, resolve } = contextsById[id];
       if (isWrite(request)) {
         // Writes cannot be resent because they will fail for a duplicate nonce.
-        contextsById.delete(id);
+        delete contextsById[id];
         resolve({
           type: "networkError",
           status: 0,
@@ -55,7 +58,7 @@ export function makeWebSocketSender(ws: SturdyWebSocket): AlchemySendFunction {
     });
   });
   ws.addEventListener("reopen", () => {
-    for (const { request } of contextsById.values()) {
+    for (const { request } of Object.values(contextsById)) {
       ws.send(JSON.stringify(request));
     }
   });
@@ -64,7 +67,7 @@ export function makeWebSocketSender(ws: SturdyWebSocket): AlchemySendFunction {
     new Promise((resolve) => {
       const id = getIdFromRequest(request);
       if (id !== undefined) {
-        const existingContext = contextsById.get(id);
+        const existingContext = contextsById[id];
         if (existingContext) {
           const message = `Another WebSocket request was made with the same id (${id}) before a response was received.`;
           console.error(message);
@@ -74,7 +77,7 @@ export function makeWebSocketSender(ws: SturdyWebSocket): AlchemySendFunction {
             status: 0,
           });
         }
-        contextsById.set(id, { request, resolve });
+        contextsById[id] = { request, resolve };
       }
       ws.send(JSON.stringify(request));
     });

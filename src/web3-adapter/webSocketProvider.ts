@@ -91,30 +91,42 @@ interface LogsSubscription extends VirtualSubscription {
   backfillBuffer: LogsEvent[];
 }
 
+type VirtualSubscriptionMap = { [key in string]: VirtualSubscription };
+type StringMap = { [key in string]: string };
+
 export class AlchemyWebSocketProvider
   extends EventEmitter
-  implements Web3SubscriptionProvider {
+  implements Web3SubscriptionProvider
+{
   // In the case of a WebSocket reconnection, all subscriptions are lost and we
   // create new ones to replace them, but we want to create the illusion that
   // the original subscriptions persist. Thus, maintain a mapping from the
   // "virtual" subscription ids which are visible to the consumer to the
   // "physical" subscription ids of the actual connections. This terminology is
   // borrowed from virtual and physical memory, which has a similar mapping.
-  private readonly virtualSubscriptionsById: Map<
-    string,
-    VirtualSubscription
-  > = new Map();
-  private readonly virtualIdsByPhysicalId: Map<string, string> = new Map();
+  private readonly virtualSubscriptionsById: VirtualSubscriptionMap;
+  private virtualIdsByPhysicalId: StringMap;
   private readonly backfiller: Backfiller;
   private heartbeatIntervalId?: NodeJS.Timeout;
   private cancelBackfill = noop;
 
+  private readonly ws: SturdyWebSocket;
+  private readonly sendPayload: SendPayloadFunction;
+  private readonly senders: JsonRpcSenders;
+
   constructor(
-    private readonly ws: SturdyWebSocket,
-    private readonly sendPayload: SendPayloadFunction,
-    private readonly senders: JsonRpcSenders,
+    ws: SturdyWebSocket,
+    sendPayload: SendPayloadFunction,
+    senders: JsonRpcSenders,
   ) {
     super();
+    this.ws = ws;
+    this.sendPayload = sendPayload;
+    this.senders = senders;
+
+    this.virtualSubscriptionsById = {};
+    this.virtualIdsByPhysicalId = {};
+
     this.backfiller = makeBackfiller(senders);
     this.addSocketListeners();
     this.startHeartbeat();
@@ -169,7 +181,7 @@ export class AlchemyWebSocketProvider
     const startingBlockNumber = await this.getBlockNumber();
     const response = await this.sendPayload(request);
     const id = response.result;
-    this.virtualSubscriptionsById.set(id, {
+    this.virtualSubscriptionsById[id] = {
       method,
       params,
       startingBlockNumber,
@@ -178,24 +190,22 @@ export class AlchemyWebSocketProvider
       sentEvents: [],
       isBackfilling: false,
       backfillBuffer: [],
-    });
-    this.virtualIdsByPhysicalId.set(id, id);
+    };
+    this.virtualIdsByPhysicalId[id] = id;
     return makeResponse(request.id!, id);
   }
 
   private async unsubscribe(request: JsonRpcRequest): Promise<JsonRpcResponse> {
     const subscriptionId = request.params?.[0];
-    const virtualSubscription = this.virtualSubscriptionsById.get(
-      subscriptionId,
-    );
+    const virtualSubscription = this.virtualSubscriptionsById[subscriptionId];
     if (!virtualSubscription) {
       return makeResponse(request.id!, false);
     }
     const { physicalId } = virtualSubscription;
     const physicalRequest = { ...request, params: [physicalId] };
     await this.sendPayload(physicalRequest);
-    this.virtualSubscriptionsById.delete(subscriptionId);
-    this.virtualIdsByPhysicalId.delete(physicalId);
+    delete this.virtualSubscriptionsById[subscriptionId];
+    delete this.virtualIdsByPhysicalId[physicalId];
     return makeResponse(request.id!, true);
   }
 
@@ -241,11 +251,11 @@ export class AlchemyWebSocketProvider
       return;
     }
     const physicalId = message.params.subscription;
-    const virtualId = this.virtualIdsByPhysicalId.get(physicalId);
+    const virtualId = this.virtualIdsByPhysicalId[physicalId];
     if (!virtualId) {
       return;
     }
-    const subscription = this.virtualSubscriptionsById.get(virtualId)!;
+    const subscription = this.virtualSubscriptionsById[virtualId];
     if (subscription.method !== "eth_subscribe") {
       this.emitGenericEvent(virtualId, message.params.result);
       return;
@@ -281,10 +291,10 @@ export class AlchemyWebSocketProvider
   };
 
   private handleReopen = (): void => {
-    this.virtualIdsByPhysicalId.clear();
+    this.virtualIdsByPhysicalId = {};
     const { cancel, isCancelled } = makeCancelToken();
     this.cancelBackfill = cancel;
-    for (const subscription of this.virtualSubscriptionsById.values()) {
+    for (const subscription of Object.values(this.virtualSubscriptionsById)) {
       (async () => {
         try {
           await this.resubscribeAndBackfill(isCancelled, subscription);
@@ -319,7 +329,7 @@ export class AlchemyWebSocketProvider
       const physicalId = await this.senders.send(method, params);
       throwIfCancelled(isCancelled);
       subscription.physicalId = physicalId;
-      this.virtualIdsByPhysicalId.set(physicalId, virtualId);
+      this.virtualIdsByPhysicalId[physicalId] = virtualId;
       switch (params[0]) {
         case "newHeads": {
           const backfillEvents = await withBackoffRetries(
@@ -393,7 +403,7 @@ export class AlchemyWebSocketProvider
     result: T,
     getBlockNumber: (result: T) => number,
   ): void {
-    const subscription = this.virtualSubscriptionsById.get(virtualId);
+    const subscription = this.virtualSubscriptionsById[virtualId];
     if (!subscription) {
       return;
     }

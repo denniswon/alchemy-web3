@@ -11,6 +11,23 @@ function config(minimize) {
       path: path.resolve(__dirname, "dist"),
     },
     optimization: { minimize },
+    module: {
+      rules: [
+        {
+          test: /\.m?js$/,
+          exclude: /(node_modules)/,
+          loader: "babel-loader",
+          options: {
+            presets: [
+              "@babel/preset-env",
+              {
+                plugins: ["@babel/plugin-proposal-class-properties"],
+              },
+            ],
+          },
+        },
+      ],
+    },
   };
 }
 

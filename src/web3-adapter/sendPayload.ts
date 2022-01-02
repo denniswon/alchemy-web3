@@ -65,7 +65,7 @@ export function makePayloadSender(
   };
 
   function setWriteProvider(writeProvider: Provider | null | undefined) {
-    currentWriteProvider = writeProvider ?? null;
+    currentWriteProvider = writeProvider || null;
   }
 
   return { sendPayload: sendPayload as SendPayloadFunction, setWriteProvider };
@@ -76,9 +76,8 @@ function sendWithProvider(
   payload: SingleOrBatchRequest,
 ): Promise<SingleOrBatchResponse> {
   const anyProvider: any = provider;
-  const sendMethod = (anyProvider.sendAsync
-    ? anyProvider.sendAsync
-    : anyProvider.send
+  const sendMethod = (
+    anyProvider.sendAsync ? anyProvider.sendAsync : anyProvider.send
   ).bind(anyProvider);
   return promisify((callback) => sendMethod(payload, callback));
 }
